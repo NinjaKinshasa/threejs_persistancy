@@ -20,6 +20,21 @@ let renderBufferB = new THREE.WebGLRenderTarget(
   innerHeight * devicePixelRatio
 )
 
+let channel0target = new THREE.WebGLRenderTarget(
+  innerWidth * devicePixelRatio,
+  innerHeight * devicePixelRatio
+)
+
+let channel0previous = new THREE.WebGLRenderTarget(
+  innerWidth * devicePixelRatio,
+  innerHeight * devicePixelRatio
+)
+
+let finalTarget = new THREE.WebGLRenderTarget(
+  innerWidth * devicePixelRatio,
+  innerHeight * devicePixelRatio
+) 
+
 // Create a threejs renderer:
 // 1. Size it correctly
 // 2. Set default background color
@@ -203,12 +218,12 @@ const shaderChannel0 = new THREE.ShaderMaterial({
       float prevColor = grayscale_prev * persistancyFactor;
       float newColor = (grayscale_prev * persistancyFactor + dist);
 
-      //gl_FragColor = vec4(vec3(max(prevColor, dist)), 1.);
+      gl_FragColor = vec4(vec3(max(prevColor, dist)), 1.);
       //gl_FragColor = vec4(vec3(dist), 1.);
 
       //gl_FragColor = prevColor + vec4(vec3(dist), 1.);
 
-      gl_FragColor = mix(texture2D(sampler, v_uv), vec4(0.,0.,0.,1.), 0.05) + vec4(vec3(dist), 1.);
+      //gl_FragColor = mix(texture2D(sampler, v_uv), vec4(0.,0.,0.,1.), 0.05) + vec4(vec3(dist), 1.);
     }
     `,
     transparent: true
@@ -219,47 +234,37 @@ sceneChannel0.add(meshChannel0)
 
 
 renderer.domElement.addEventListener('mousemove', (evt) => {
-    console.log(evt.clientX, evt.clientY);
+    //console.log(evt.clientX, evt.clientY);
     shaderFinalScene.uniforms['u_mouse'].value.x = evt.clientX;
     shaderFinalScene.uniforms['u_mouse'].value.y = window.innerHeight - evt.clientY;
     shaderChannel0.uniforms['u_mouse'].value.x = evt.clientX;
     shaderChannel0.uniforms['u_mouse'].value.y = window.innerHeight - evt.clientY;
 });
 
+renderer.autoClearColor = false;
 // Start out animation render loop
 renderer.setAnimationLoop(onAnimLoop)
 
+
 function onAnimLoop() {
-  // Do not clear the contents of the canvas on each render
-  // In order to achieve our effect, we must draw the new frame
-  // on top of the previous one!
-  renderer.autoClearColor = false
-  
-  // Explicitly set renderBufferA as the framebuffer to render to
-  renderer.setRenderTarget(renderBufferA)
-  
-  // On each new frame, render the scene to renderBufferA
-  renderer.render(finalScene, orthoCamera)
-  renderer.render(sceneChannel0, orthoCamera)
 
-  // Set the device screen as the framebuffer to render to
-  // In WebGL, framebuffer "null" corresponds to the default framebuffer!
-  renderer.setRenderTarget(null)
-  
-  // Assign the generated texture to the sampler variable used
-  // in the postFXMesh that covers the device screen
-  //postFXMesh.material.uniforms.sampler.value = renderBufferA.texture
-  meshFinalScene.material.uniforms.sampler.value = renderBufferA.texture
-  meshChannel0.material.uniforms.sampler.value = renderBufferA.texture
+  // on fait un rendu du channel0 vers le target
+  renderer.setRenderTarget(channel0target)
+  renderer.render(sceneChannel0, orthoCamera);
 
-  // Render the postFX mesh to the default framebuffer
-  renderer.render(finalScene, orthoCamera)
+  // le rendu est passé à la fois à lui même et à la scene finale
+  meshFinalScene.material.uniforms.sampler.value = channel0target.texture
+  meshChannel0.material.uniforms.sampler.value = channel0target.texture
 
-  //renderer.render(scene, orthoCamera)
-  
-  // Ping-pong our framebuffers by swapping them
-  // at the end of each frame render
-  const temp = renderBufferA
-  renderBufferA = renderBufferB
-  renderBufferB = temp
+  // target = null => rendu sur l'ecran
+  renderer.setRenderTarget(null);
+  // On peut decommenter la ligne suivante pour avoir le rendu de la premiere scene
+  //renderer.render(sceneChannel0, orthoCamera);
+  renderer.render(finalScene, orthoCamera);
+
+  // swap les 2 buffers du channel 0 pour eviter les erreurs webgl
+  const temp = channel0target
+  channel0target = channel0previous
+  channel0previous = temp
+
 }
