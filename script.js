@@ -4,7 +4,7 @@ console.clear()
 const LABEL_TEXT = 'ABC'
 
 const clock = new THREE.Clock()
-const scene = new THREE.Scene()
+const sceneChannel0 = new THREE.Scene()
 
 //const restartAnimButton = document.getElementById('restart-anim')
 
@@ -63,17 +63,17 @@ const cubeBleu = new THREE.Mesh(
     new THREE.MeshBasicMaterial({ color: 0x0000ff })
 );
 
-scene.add(sphere);
-scene.add(cube);
-scene.add(cubevert);
+// scene.add(sphere);
+// scene.add(cube);
+// scene.add(cubevert);
 
 // Create a second scene that will hold our fullscreen plane
-const postFXScene = new THREE.Scene()
+const finalScene = new THREE.Scene()
 // Create a plane geometry that covers the entire screen
 const postFXGeometry = new THREE.PlaneGeometry(13, 6)
 
-//postFXScene.add(cubevert);
-//postFXScene.add(cubeBleu);
+//finalScene.add(cubevert);
+//finalScene.add(cubeBleu);
 cubeBleu.position.z = 1;
 
 
@@ -118,11 +118,11 @@ const postFXMaterial = new THREE.ShaderMaterial({
     transparent: true
 })
 // const postFXMesh = new THREE.Mesh(postFXGeometry, postFXMaterial)
-// postFXScene.add(postFXMesh)
+// finalScene.add(postFXMesh)
 
 
 
-const fullscreenShader = new THREE.ShaderMaterial({
+const shaderFinalScene = new THREE.ShaderMaterial({
     uniforms: {
         u_mouse: {value: new THREE.Vector2(0, 0)},
         sampler: { value: null },
@@ -141,38 +141,35 @@ const fullscreenShader = new THREE.ShaderMaterial({
         uniform vec2 u_mouse;
         uniform sampler2D sampler;
 
-
-  
         void main () {
 
-          float persistancyFactor = .98;
 
-          float circle_size = 150.;
-          float dispersionRatio = 0.7;
-          vec2 center = u_mouse.xy;
+          gl_FragColor = vec4(1., 0., 1., 1.);
 
-          float dist = 1. - smoothstep(circle_size * (1. - dispersionRatio), circle_size * (1. + dispersionRatio), distance(center, gl_FragCoord.xy));
-          
-          float grayscale_prev = texture(sampler, v_uv).r;
+          // violet
+          vec4 backgroundColor = vec4(1., 0., 1., 1.);
 
-          float prevColor = grayscale_prev * persistancyFactor;
-          float newColor = (grayscale_prev * persistancyFactor + dist);
+          // jaune
+          vec4 foregroundColor = vec4(1., 1., 0., 1.);
 
-          //gl_FragColor = vec4(vec3(max(prevColor, dist)), 1.);
-          //gl_FragColor = vec4(vec3(dist), 1.);
+          //gl_FragColor = foregroundColor;
 
-          //gl_FragColor = prevColor + vec4(vec3(dist), 1.);
+          vec4 channel0Color = texture2D(sampler, v_uv);
+          float opacityMask = channel0Color.r;
 
-          gl_FragColor = mix(texture2D(sampler, v_uv), vec4(0.,0.,0.,1.), 0.05) + vec4(vec3(dist), 1.);
+          gl_FragColor = mix(backgroundColor, foregroundColor, opacityMask);
+
+          //gl_FragColor = texture2D(sampler, v_uv );
+
         }
       `,
       transparent: true
 });
 
-const fullscreenMesh = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), fullscreenShader);
-postFXScene.add(fullscreenMesh)
+const meshFinalScene = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), shaderFinalScene);
+finalScene.add(meshFinalScene)
 
-const distortionShader = new THREE.ShaderMaterial({
+const shaderChannel0 = new THREE.ShaderMaterial({
   uniforms: {
       u_mouse: {value: new THREE.Vector2(0, 0)},
       sampler: { value: null },
@@ -187,28 +184,46 @@ const distortionShader = new THREE.ShaderMaterial({
       }
     `,
   fragmentShader: `
-      varying vec2 v_uv;
-      uniform vec2 u_mouse;
-      uniform sampler2D sampler;
+    varying vec2 v_uv;
+    uniform vec2 u_mouse;
+    uniform sampler2D sampler;
 
+    void main () {
 
+      float persistancyFactor = .98;
 
-      void main () {
+      float circle_size = 150.;
+      float dispersionRatio = 0.7;
+      vec2 center = u_mouse.xy;
 
-        gl_FragColor = vec4(1., 0., 1., 1.);
-      }
+      float dist = 1. - smoothstep(circle_size * (1. - dispersionRatio), circle_size * (1. + dispersionRatio), distance(center, gl_FragCoord.xy));
+      
+      float grayscale_prev = texture(sampler, v_uv).r;
+
+      float prevColor = grayscale_prev * persistancyFactor;
+      float newColor = (grayscale_prev * persistancyFactor + dist);
+
+      //gl_FragColor = vec4(vec3(max(prevColor, dist)), 1.);
+      //gl_FragColor = vec4(vec3(dist), 1.);
+
+      //gl_FragColor = prevColor + vec4(vec3(dist), 1.);
+
+      gl_FragColor = mix(texture2D(sampler, v_uv), vec4(0.,0.,0.,1.), 0.05) + vec4(vec3(dist), 1.);
+    }
     `,
     transparent: true
 });
 
-
+const meshChannel0 = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), shaderChannel0);
+sceneChannel0.add(meshChannel0)
 
 
 renderer.domElement.addEventListener('mousemove', (evt) => {
     console.log(evt.clientX, evt.clientY);
-    fullscreenShader.uniforms['u_mouse'].value.x = evt.clientX;
-    fullscreenShader.uniforms['u_mouse'].value.y = window.innerHeight - evt.clientY;
-
+    shaderFinalScene.uniforms['u_mouse'].value.x = evt.clientX;
+    shaderFinalScene.uniforms['u_mouse'].value.y = window.innerHeight - evt.clientY;
+    shaderChannel0.uniforms['u_mouse'].value.x = evt.clientX;
+    shaderChannel0.uniforms['u_mouse'].value.y = window.innerHeight - evt.clientY;
 });
 
 // Start out animation render loop
@@ -218,15 +233,15 @@ function onAnimLoop() {
   // Do not clear the contents of the canvas on each render
   // In order to achieve our effect, we must draw the new frame
   // on top of the previous one!
- renderer.autoClearColor = false
+  renderer.autoClearColor = false
   
   // Explicitly set renderBufferA as the framebuffer to render to
   renderer.setRenderTarget(renderBufferA)
   
   // On each new frame, render the scene to renderBufferA
-  renderer.render(postFXScene, orthoCamera)
-  renderer.render(scene, orthoCamera)
-  
+  renderer.render(finalScene, orthoCamera)
+  renderer.render(sceneChannel0, orthoCamera)
+
   // Set the device screen as the framebuffer to render to
   // In WebGL, framebuffer "null" corresponds to the default framebuffer!
   renderer.setRenderTarget(null)
@@ -234,10 +249,11 @@ function onAnimLoop() {
   // Assign the generated texture to the sampler variable used
   // in the postFXMesh that covers the device screen
   //postFXMesh.material.uniforms.sampler.value = renderBufferA.texture
-  fullscreenMesh.material.uniforms.sampler.value = renderBufferA.texture
+  meshFinalScene.material.uniforms.sampler.value = renderBufferA.texture
+  meshChannel0.material.uniforms.sampler.value = renderBufferA.texture
 
   // Render the postFX mesh to the default framebuffer
-  renderer.render(postFXScene, orthoCamera)
+  renderer.render(finalScene, orthoCamera)
 
   //renderer.render(scene, orthoCamera)
   
