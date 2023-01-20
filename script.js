@@ -29,6 +29,7 @@ const shaderFinalScene = new THREE.ShaderMaterial({
     uniforms: {
         u_mouse: {value: new THREE.Vector2(0, 0)},
         sampler: { value: null },
+        u_time: { value: 0 },
     },
     // vertex shader will be in charge of positioning our plane correctly
     vertexShader: `
@@ -43,27 +44,42 @@ const shaderFinalScene = new THREE.ShaderMaterial({
         varying vec2 v_uv;
         uniform vec2 u_mouse;
         uniform sampler2D sampler;
+        uniform float u_time;
+
+        float mod289(float x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
+        vec4 mod289(vec4 x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
+        vec4 perm(vec4 x){return mod289(((x * 34.0) + 1.0) * x);}
+
+        float noise(vec3 p){
+            vec3 a = floor(p);
+            vec3 d = p - a;
+            d = d * d * (3.0 - 2.0 * d);
+
+            vec4 b = a.xxyy + vec4(0.0, 1.0, 0.0, 1.0);
+            vec4 k1 = perm(b.xyxy);
+            vec4 k2 = perm(k1.xyxy + b.zzww);
+
+            vec4 c = k2 + a.zzzz;
+            vec4 k3 = perm(c);
+            vec4 k4 = perm(c + 1.0);
+
+            vec4 o1 = fract(k3 * (1.0 / 41.0));
+            vec4 o2 = fract(k4 * (1.0 / 41.0));
+
+            vec4 o3 = o2 * d.z + o1 * (1.0 - d.z);
+            vec2 o4 = o3.yw * d.x + o3.xz * (1.0 - d.x);
+
+            return o4.y * d.y + o4.x * (1.0 - d.y);
+        }
 
         void main () {
-
-
-          gl_FragColor = vec4(1., 0., 1., 1.);
-
-          // violet
-          vec4 backgroundColor = vec4(1., 0., 1., 1.);
-
-          // jaune
-          vec4 foregroundColor = vec4(1., 1., 0., 1.);
-
-          //gl_FragColor = foregroundColor;
-
-          vec4 channel0Color = texture2D(sampler, v_uv);
-          float opacityMask = channel0Color.r;
-
-          gl_FragColor = mix(backgroundColor, foregroundColor, opacityMask);
-
-          //gl_FragColor = texture2D(sampler, v_uv );
-
+          vec2 uv = v_uv;
+          float n = noise(vec3(uv * 10., 0) + u_time * 1.5);
+          vec2 noisedUV = uv * n;
+          vec2 distortion = noisedUV * 0.1;
+          uv += distortion;
+          float opacity = texture(sampler, uv).r;
+          gl_FragColor = mix(vec4(1., 0., 1., 1.), vec4(1., 1., 0., 1.), opacity);
         }
       `,
       transparent: true
@@ -159,5 +175,8 @@ function onAnimLoop() {
   const temp = channel0target
   channel0target = channel0previous
   channel0previous = temp
+
+  //update unifromes 
+  meshFinalScene.material.uniforms.u_time.value += 0.01;
 
 }
