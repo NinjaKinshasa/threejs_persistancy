@@ -1,8 +1,21 @@
 import * as THREE from 'three'
+import { maskShader } from './shaders/maskShader'
+import { backgroundShader } from './shaders/backgroundShader'
+import sceneBackground from './sceneBackground'
+
 console.clear()
 
+/*
+    3 scenes : 
+    - channel0 = mask
+    - channel1 = background
+    - output = mix des deux
+ */
 
 const sceneChannel0 = new THREE.Scene()
+
+
+//Todo renommer en sceneOutput
 const finalScene = new THREE.Scene()
 
 let channel0target = new THREE.WebGLRenderTarget(
@@ -11,6 +24,11 @@ let channel0target = new THREE.WebGLRenderTarget(
 )
 
 let channel0previous = new THREE.WebGLRenderTarget(
+  innerWidth * devicePixelRatio,
+  innerHeight * devicePixelRatio
+)
+
+let channel1target = new THREE.WebGLRenderTarget(
   innerWidth * devicePixelRatio,
   innerHeight * devicePixelRatio
 )
@@ -24,19 +42,25 @@ document.body.appendChild(renderer.domElement)
 const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 100);
 camera.position.set(0, 0, 10)
 
+
+
+const shaderBackground = backgroundShader;
+
 // Shader de la scene finale
 const shaderFinalScene = new THREE.ShaderMaterial({
     uniforms: {
         u_mouse: {value: new THREE.Vector2(0, 0)},
         sampler: { value: null },
         u_time: { value: 0 },
+        u_channel1: { value: null },
     },
     // vertex shader will be in charge of positioning our plane correctly
     vertexShader: `
         varying vec2 v_uv;
-  
+
         void main () {
           v_uv = uv;
+
           gl_Position = vec4(position, 1.0);          
         }
       `,
@@ -44,6 +68,8 @@ const shaderFinalScene = new THREE.ShaderMaterial({
         varying vec2 v_uv;
         uniform vec2 u_mouse;
         uniform sampler2D sampler;
+        uniform sampler2D u_channel1;
+
         uniform float u_time;
 
         float mod289(float x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
@@ -72,14 +98,32 @@ const shaderFinalScene = new THREE.ShaderMaterial({
             return o4.y * d.y + o4.x * (1.0 - d.y);
         }
 
+        float random(vec2 fg)
+        {
+            vec2 k1 = vec2( 23.14069263277926, // e^pi (Gelfond's constant)
+            2.665144142690225 // 2^sqrt(2) (Gelfond–Schneider constant)
+        );
+        return fract(cos(dot(fg, k1) ) * 12345.6789);
+        }
+
         void main () {
-          vec2 uv = v_uv;
-          float n = noise(vec3(uv * 10., 0) + u_time * 1.5);
-          vec2 noisedUV = uv * n;
-          vec2 distortion = noisedUV * 0.1;
-          uv += distortion;
-          float opacity = texture(sampler, uv).r;
-          gl_FragColor = mix(vec4(1., 0., 1., 1.), vec4(1., 1., 0., 1.), opacity);
+            vec2 uv = v_uv;
+            float n = noise(vec3(uv * 10., 0) + u_time * 1.5);
+            vec2 distortion = uv * n * 0.05;
+            uv += distortion;
+            float opacity = texture(sampler, uv).r;
+
+
+            vec4 backgroundColor = texture(u_channel1, v_uv);
+
+            vec2 uvrandom = v_uv;
+            uvrandom.y *= random(vec2(uvrandom.y, 0.4 ));
+
+            backgroundColor.rbg += random(uvrandom) * 0.1;
+           // opacity += random(uvrandom) * .3;
+
+
+            gl_FragColor = mix(vec4(1., 1., 1., 0.5), backgroundColor, opacity);
         }
       `,
       transparent: true
@@ -87,50 +131,7 @@ const shaderFinalScene = new THREE.ShaderMaterial({
 
 
 // Shader de la scene channel0, qui sera le mask
-const shaderChannel0 = new THREE.ShaderMaterial({
-  uniforms: {
-      u_mouse: {value: new THREE.Vector2(0, 0)},
-      sampler: { value: null },
-  },
-  // vertex shader will be in charge of positioning our plane correctly
-  vertexShader: `
-      varying vec2 v_uv;
-
-      void main () {
-        v_uv = uv;
-        gl_Position = vec4(position, 1.0);          
-      }
-    `,
-  fragmentShader: `
-    varying vec2 v_uv;
-    uniform vec2 u_mouse;
-    uniform sampler2D sampler;
-
-    void main () {
-
-      float persistancyFactor = .98;
-
-      float circle_size = 150.;
-      float dispersionRatio = 0.7;
-      vec2 center = u_mouse.xy;
-
-      float dist = 1. - smoothstep(circle_size * (1. - dispersionRatio), circle_size * (1. + dispersionRatio), distance(center, gl_FragCoord.xy));
-      
-      float grayscale_prev = texture(sampler, v_uv).r;
-
-      float prevColor = grayscale_prev * persistancyFactor;
-      float newColor = (grayscale_prev * persistancyFactor + dist);
-
-      gl_FragColor = vec4(vec3(max(prevColor, dist)), 1.);
-      //gl_FragColor = vec4(vec3(dist), 1.);
-
-      //gl_FragColor = prevColor + vec4(vec3(dist), 1.);
-
-      //gl_FragColor = mix(texture2D(sampler, v_uv), vec4(0.,0.,0.,1.), 0.05) + vec4(vec3(dist), 1.);
-    }
-    `,
-    transparent: true
-});
+const shaderChannel0 = maskShader;
 
 // définition des mesh, les geométries sont pas prises en compte par les shaders
 const meshFinalScene = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), shaderFinalScene);
@@ -165,12 +166,19 @@ function onAnimLoop() {
   meshFinalScene.material.uniforms.sampler.value = channel0target.texture
   meshChannel0.material.uniforms.sampler.value = channel0target.texture
 
+  renderer.setRenderTarget(channel1target);
+  renderer.render(sceneBackground.scene, sceneBackground.camera);
+
+  meshFinalScene.material.uniforms['u_channel1'].value = channel1target.texture
+
+  sceneBackground.uniforms.u_time.value ++;
+
   // target = null => rendu sur l'ecran
   renderer.setRenderTarget(null);
   // On peut decommenter la ligne suivante pour avoir le rendu de la premiere scene
   //renderer.render(sceneChannel0, camera);
   renderer.render(finalScene, camera);
-
+  renderer.render(sceneBackground.scene, sceneBackground.camera);
   // swap les 2 buffers du channel 0 pour eviter les erreurs webgl
   const temp = channel0target
   channel0target = channel0previous
@@ -180,3 +188,9 @@ function onAnimLoop() {
   meshFinalScene.material.uniforms.u_time.value += 0.01;
 
 }
+
+
+// next steps : 
+// ajouter le fond multicolore
+// ajouter le layer du bruit ?
+// ajouter le délais de la souris (lerp)
