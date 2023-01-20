@@ -11,14 +11,23 @@ let channel0previous = new THREE.WebGLRenderTarget(innerWidth * devicePixelRatio
 let channel1target = new THREE.WebGLRenderTarget(innerWidth * devicePixelRatio,innerHeight * devicePixelRatio)
 
 // Ajout d'un renderer à la page
-const renderer = new THREE.WebGLRenderer()
-renderer.setSize(innerWidth, innerHeight)
-document.body.appendChild(renderer.domElement)
+const canvas = document.querySelector('#gl');
+const renderer = new THREE.WebGLRenderer({canvas: canvas});
+
+renderer.setSize(innerWidth, innerHeight);
 
 
 // animation loop
 renderer.autoClearColor = false;
 renderer.setAnimationLoop(onAnimLoop)
+
+/* detect resize */
+window.addEventListener('resize', (evt) => {
+  renderer.setSize(innerWidth, innerHeight);
+  channel0target.setSize(innerWidth * devicePixelRatio, innerHeight * devicePixelRatio);
+  channel0previous.setSize(innerWidth * devicePixelRatio, innerHeight * devicePixelRatio);
+  channel1target.setSize(innerWidth * devicePixelRatio, innerHeight * devicePixelRatio);
+});
 
 function onAnimLoop() {
 

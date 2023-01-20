@@ -18,6 +18,13 @@ document.addEventListener('mousemove', (evt) => {
     shader.uniforms['u_mouse'].value.y = innerHeight - evt.clientY;
 });
 
+/* detect resize */
+window.addEventListener('resize', (evt) => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+});
+
+
 let uniforms = shader.uniforms;
 
 export default {scene, camera, uniforms};

@@ -58,11 +58,18 @@ document.addEventListener("mousemove", (event) => {
 });
 
 document.addEventListener("wheel", (event) => {
-    camera.position.z += event.deltaY * 0.001;
+    //camera.position.z += event.deltaY * 0.001;
 });
 
 
-// zoom in event
+/* detect resize */
+window.addEventListener('resize', (evt) => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+});
+
+
+
 
 camera.position.z = 0.3860;
 
