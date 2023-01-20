@@ -1,24 +1,9 @@
 import * as THREE from 'three'
 console.clear()
 
-const LABEL_TEXT = 'ABC'
 
-const clock = new THREE.Clock()
 const sceneChannel0 = new THREE.Scene()
-
-//const restartAnimButton = document.getElementById('restart-anim')
-
-// Create a new framebuffer we will use to render to
-// the video card memory
-let renderBufferA = new THREE.WebGLRenderTarget(
-  innerWidth * devicePixelRatio,
-  innerHeight * devicePixelRatio
-)
-// Create a second framebuffer
-let renderBufferB = new THREE.WebGLRenderTarget(
-  innerWidth * devicePixelRatio,
-  innerHeight * devicePixelRatio
-)
+const finalScene = new THREE.Scene()
 
 let channel0target = new THREE.WebGLRenderTarget(
   innerWidth * devicePixelRatio,
@@ -30,113 +15,16 @@ let channel0previous = new THREE.WebGLRenderTarget(
   innerHeight * devicePixelRatio
 )
 
-let finalTarget = new THREE.WebGLRenderTarget(
-  innerWidth * devicePixelRatio,
-  innerHeight * devicePixelRatio
-) 
-
-// Create a threejs renderer:
-// 1. Size it correctly
-// 2. Set default background color
-// 3. Append it to the page
+// Ajout d'un renderer à la page
 const renderer = new THREE.WebGLRenderer()
-renderer.setClearColor(0x222222)
-renderer.setClearAlpha(0)
 renderer.setSize(innerWidth, innerHeight)
-renderer.setPixelRatio(devicePixelRatio || 1)
 document.body.appendChild(renderer.domElement)
 
-// Create an orthographic camera that covers the entire screen
-// 1. Position it correctly in the positive Z dimension
-// 2. Orient it towards the scene center
-const orthoCamera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 100);
-orthoCamera.position.set(0, 0, 10)
-// orthoCamera.lookAt(new THREE.Vector3(0, 0, 0))
+// Ajout de la camera
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 0, 10)
 
-// Create a plane geometry that spawns either the entire
-// viewport height or width depending on which one is bigger
-
-
-
-const sphere = new THREE.Mesh(
-    new THREE.SphereGeometry(1.3, 20, 20),
-    new THREE.MeshBasicMaterial({ color: 0xFF0000 })
-);
-
-const cube = new THREE.Mesh(
-    new THREE.BoxGeometry(2, 2, 2),
-    new THREE.MeshBasicMaterial({ color: 0xFF0000 })
-);
-
-const cubevert = new THREE.Mesh(
-    new THREE.BoxGeometry(2, 2, 2),
-    new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-);
-
-const cubeBleu = new THREE.Mesh(
-    new THREE.PlaneGeometry(3, 2),
-    new THREE.MeshBasicMaterial({ color: 0x0000ff })
-);
-
-// scene.add(sphere);
-// scene.add(cube);
-// scene.add(cubevert);
-
-// Create a second scene that will hold our fullscreen plane
-const finalScene = new THREE.Scene()
-// Create a plane geometry that covers the entire screen
-const postFXGeometry = new THREE.PlaneGeometry(13, 6)
-
-//finalScene.add(cubevert);
-//finalScene.add(cubeBleu);
-cubeBleu.position.z = 1;
-
-
-
-// Create a plane material that expects a sampler texture input
-// We will pass our generated framebuffer texture to it
-const postFXMaterial = new THREE.ShaderMaterial({
-  uniforms: {
-    sampler: { value: null },
-  },
-  // vertex shader will be in charge of positioning our plane correctly
-  vertexShader: `
-      varying vec2 v_uv;
-
-      void main () {
-        // Set the correct position of each plane vertex
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-
-        // Pass in the correct UVs to the fragment shader
-        v_uv = uv;
-      }
-    `,
-  fragmentShader: `
-      // Declare our texture input as a "sampler" variable
-      uniform sampler2D sampler;
-
-      // Consume the correct UVs from the vertex shader to use
-      // when displaying the generated texture
-      varying vec2 v_uv;
-
-      void main () {
-        // Sample the correct color from the generated texture
-        vec4 inputColor = texture2D(sampler, v_uv );
-        // Set the correct color of each pixel that makes up the plane
-        // gl_FragColor = vec4(inputColor * 0.975);
-
-        //gl_FragColor = vec4(inputColor);
-        gl_FragColor = vec4(vec3(0.,0.,1.),1.);
-        gl_FragColor = vec4(inputColor);
-      }
-    `,
-    transparent: true
-})
-// const postFXMesh = new THREE.Mesh(postFXGeometry, postFXMaterial)
-// finalScene.add(postFXMesh)
-
-
-
+// Shader de la scene finale
 const shaderFinalScene = new THREE.ShaderMaterial({
     uniforms: {
         u_mouse: {value: new THREE.Vector2(0, 0)},
@@ -181,9 +69,8 @@ const shaderFinalScene = new THREE.ShaderMaterial({
       transparent: true
 });
 
-const meshFinalScene = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), shaderFinalScene);
-finalScene.add(meshFinalScene)
 
+// Shader de la scene channel0, qui sera le mask
 const shaderChannel0 = new THREE.ShaderMaterial({
   uniforms: {
       u_mouse: {value: new THREE.Vector2(0, 0)},
@@ -229,10 +116,15 @@ const shaderChannel0 = new THREE.ShaderMaterial({
     transparent: true
 });
 
+// définition des mesh, les geométries sont pas prises en compte par les shaders
+const meshFinalScene = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), shaderFinalScene);
 const meshChannel0 = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), shaderChannel0);
+
+// Ajout des mesh à la scene
+finalScene.add(meshFinalScene)
 sceneChannel0.add(meshChannel0)
 
-
+// detection du mouvement de la souris
 renderer.domElement.addEventListener('mousemove', (evt) => {
     //console.log(evt.clientX, evt.clientY);
     shaderFinalScene.uniforms['u_mouse'].value.x = evt.clientX;
@@ -241,8 +133,9 @@ renderer.domElement.addEventListener('mousemove', (evt) => {
     shaderChannel0.uniforms['u_mouse'].value.y = window.innerHeight - evt.clientY;
 });
 
+
+// animation loop
 renderer.autoClearColor = false;
-// Start out animation render loop
 renderer.setAnimationLoop(onAnimLoop)
 
 
@@ -250,7 +143,7 @@ function onAnimLoop() {
 
   // on fait un rendu du channel0 vers le target
   renderer.setRenderTarget(channel0target)
-  renderer.render(sceneChannel0, orthoCamera);
+  renderer.render(sceneChannel0, camera);
 
   // le rendu est passé à la fois à lui même et à la scene finale
   meshFinalScene.material.uniforms.sampler.value = channel0target.texture
@@ -259,8 +152,8 @@ function onAnimLoop() {
   // target = null => rendu sur l'ecran
   renderer.setRenderTarget(null);
   // On peut decommenter la ligne suivante pour avoir le rendu de la premiere scene
-  //renderer.render(sceneChannel0, orthoCamera);
-  renderer.render(finalScene, orthoCamera);
+  //renderer.render(sceneChannel0, camera);
+  renderer.render(finalScene, camera);
 
   // swap les 2 buffers du channel 0 pour eviter les erreurs webgl
   const temp = channel0target
