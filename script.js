@@ -109,7 +109,7 @@ const shaderFinalScene = new THREE.ShaderMaterial({
         void main () {
             vec2 uv = v_uv;
             float n = noise(vec3(uv * 10., 0) + u_time * 1.5);
-            vec2 distortion = uv * n * 0.05;
+            vec2 distortion = uv * n * 0.005;
             uv += distortion;
             float opacity = texture(sampler, uv).r;
 
@@ -178,7 +178,7 @@ function onAnimLoop() {
   // On peut decommenter la ligne suivante pour avoir le rendu de la premiere scene
   //renderer.render(sceneChannel0, camera);
   renderer.render(finalScene, camera);
-  renderer.render(sceneBackground.scene, sceneBackground.camera);
+  //renderer.render(sceneBackground.scene, sceneBackground.camera);
   // swap les 2 buffers du channel 0 pour eviter les erreurs webgl
   const temp = channel0target
   channel0target = channel0previous

@@ -65,18 +65,16 @@ document.addEventListener("mousemove", (event) => {
   lastMouseX = event.clientX;
   lastMouseY = event.clientY;
 
-  rotationY += deltaX * 0.01;
-  rotationX += deltaY * 0.01;
 
-  sphere.rotation.y = rotationY;
-  sphere.rotation.x = rotationX;
+  sphere.rotation.y += deltaX * 0.001;
+  sphere.rotation.x += deltaY * 0.001;
 });
 
 
 // zoom in event
 let rotation = 0;
 sphere.rotateY(THREE.MathUtils.degToRad(0));
-camera.position.z = -0.6579999999999995;
+camera.position.z = 0.38600000000000034;
 document.addEventListener( "wheel", (event) => {
    // rotation += event.deltaY * 0.002;
     // sphere.rotateY(THREE.MathUtils.degToRad(rotation));

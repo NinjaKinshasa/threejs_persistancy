@@ -83,7 +83,7 @@ void main() {
     // vec3 baseSecond = vec3(253./255., 233./255., 177./255.);
     
 	float n = noise(vPosition *4. + (u_time * 0.001));
-    vec2 baseUV = n*vPosition.xy;
+    vec2 baseUV = rotate2D(n)*vPosition.xy;
     float basePattern = lines(baseUV, 0.5);
     float secondPattern = lines(baseUV, 0.1);
 

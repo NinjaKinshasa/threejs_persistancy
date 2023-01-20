@@ -6,7 +6,7 @@ void main () {
 
 float persistancyFactor = .95;
 
-float circle_size = 160.;
+float circle_size = 100.;
 float dispersionRatio = 0.2;
 vec2 center = u_mouse.xy;
 
@@ -22,5 +22,5 @@ gl_FragColor = vec4(vec3(max(prevColor, dist)), 1.);
 
 //gl_FragColor = prevColor + vec4(vec3(dist), 1.);
 
-//gl_FragColor = mix(texture2D(sampler, v_uv), vec4(0.,0.,0.,1.), 0.05) + vec4(vec3(dist), 1.);
+gl_FragColor = mix(texture2D(sampler, v_uv), vec4(0.,0.,0.,1.), 0.05) + vec4(vec3(dist), 1.);
 }
